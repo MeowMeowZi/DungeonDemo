@@ -15,15 +15,18 @@
  *  TastSong        https://github.com/TastSong
  *  京产肠饭         https://gitee.com/JingChanChangFan/hk_-unity-tools
  *  猫叔(一只皮皮虾)  https://space.bilibili.com/656352/
+ *  New一天
+ *  幽飞冷凝雪～冷 
  *
  * Community
  *  QQ Group: 623597263
- * Latest Update: 2023.8.30 17:55 IEasyEvent add Register Method & Add Or Event
+ * Latest Update: 2023.9.12 14:42 revert operator override
  ****************************************************************************/
 
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SocialPlatforms;
 
 namespace QFramework
 {
@@ -583,11 +586,19 @@ namespace QFramework
         IUnRegister Register(Action<T> onValueChanged);
     }
 
-    public class BindableProperty<T> : IBindableProperty<T> 
+    public class BindableProperty<T> : IBindableProperty<T>
     {
         public BindableProperty(T defaultValue = default) => mValue = defaultValue;
 
         protected T mValue;
+
+        public static Func<T, T, bool> Comparer { get; set; } = (a, b) => a.Equals(b);
+
+        public BindableProperty<T> WithComparer(Func<T, T, bool> comparer)
+        {
+            Comparer = comparer;
+            return this;
+        }
 
         public T Value
         {
@@ -595,7 +606,7 @@ namespace QFramework
             set
             {
                 if (value == null && mValue == null) return;
-                if (value != null && value.Equals(mValue)) return;
+                if (value != null && Comparer(value, mValue)) return;
 
                 SetValue(value);
                 mOnValueChanged?.Invoke(value);
@@ -621,13 +632,42 @@ namespace QFramework
             onValueChanged(mValue);
             return Register(onValueChanged);
         }
-        
+
         public void UnRegister(Action<T> onValueChanged) => mOnValueChanged -= onValueChanged;
-        
+
         IUnRegister IEasyEvent.Register(Action onEvent)
         {
             return Register(Action);
             void Action(T _) => onEvent();
+        }
+        
+        public static implicit operator T(BindableProperty<T> property) => property.Value;
+        public override string ToString() => Value.ToString();
+    }
+
+    internal class ComparerAutoRegister
+    {
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        public static void AutoRegister()
+        {
+            BindableProperty<int>.Comparer = (a, b) => a == b;
+            BindableProperty<float>.Comparer = (a, b) => a == b;
+            BindableProperty<double>.Comparer = (a, b) => a == b;
+            BindableProperty<string>.Comparer = (a, b) => a == b;
+            BindableProperty<long>.Comparer = (a, b) => a == b;
+            BindableProperty<Vector2>.Comparer = (a, b) => a == b;
+            BindableProperty<Vector3>.Comparer = (a, b) => a == b;
+            BindableProperty<Vector4>.Comparer = (a, b) => a == b;
+            BindableProperty<Color>.Comparer = (a, b) => a == b;
+            BindableProperty<Color32>.Comparer = (a, b) => a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+            BindableProperty<Bounds>.Comparer = (a, b) => a == b;
+            BindableProperty<Rect>.Comparer = (a, b) => a == b;
+            BindableProperty<Quaternion>.Comparer = (a, b) => a == b;
+            BindableProperty<Vector2Int>.Comparer = (a, b) => a == b;
+            BindableProperty<Vector3Int>.Comparer = (a, b) => a == b;
+            BindableProperty<BoundsInt>.Comparer = (a, b) => a == b;
+            BindableProperty<RangeInt>.Comparer = (a, b) => a.start == b.start && a.length == b.length;
+            BindableProperty<RectInt>.Comparer = (a, b) => a.Equals(b);
         }
     }
 
@@ -770,9 +810,10 @@ namespace QFramework
     }
 
     #endregion
-    
-    
+
+
     #region Event Extension
+
     public class OrEvent : IUnRegisterList
     {
         public OrEvent Or(IEasyEvent easyEvent)
@@ -780,7 +821,7 @@ namespace QFramework
             easyEvent.Register(Trigger).AddToUnregisterList(this);
             return this;
         }
-        
+
         private Action mOnEvent = () => { };
 
         public IUnRegister Register(Action onEvent)
@@ -802,9 +843,9 @@ namespace QFramework
 
     public static class OrEventExtensions
     {
-        public static OrEvent Or(this IEasyEvent self,IEasyEvent e) => new OrEvent().Or(self).Or(e);
+        public static OrEvent Or(this IEasyEvent self, IEasyEvent e) => new OrEvent().Or(self).Or(e);
     }
-    
+
     #endregion
 
 #if UNITY_EDITOR
